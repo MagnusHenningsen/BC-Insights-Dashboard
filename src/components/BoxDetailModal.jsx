@@ -47,12 +47,19 @@ function ExpandableRow({ row, cols, isExpanded, onToggle }) {
         <tr className="detail-row-expanded">
           <td colSpan={cols.length + 1}>
             <div className="row-kv-grid">
-              {cols.map((c) => (
-                <div key={c} className="row-kv-item">
-                  <span className="row-kv-key">{c}</span>
-                  <span className="row-kv-val">{String(row[c] ?? '')}</span>
-                </div>
-              ))}
+              {cols.map((c) => {
+                const val = String(row[c] ?? '');
+                const isLong = val.length > 80 || val.includes('\n');
+                return (
+                  <div key={c} className={`row-kv-item${isLong ? ' row-kv-item-wide' : ''}`}>
+                    <span className="row-kv-key">{c}</span>
+                    {isLong
+                      ? <pre className="row-kv-val-pre">{val}</pre>
+                      : <span className="row-kv-val">{val}</span>
+                    }
+                  </div>
+                );
+              })}
             </div>
           </td>
         </tr>

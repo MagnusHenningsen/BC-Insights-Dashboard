@@ -166,107 +166,16 @@ traces
 | order by timestamp asc`;
 
 export const PRESET_QUERIES = [
-  // ─── By company ──────────────────────────────────────────────────────────
+  // ─── Slow SQL (RT0005) ────────────────────────────────────────────────────
   {
-    id: 'slow_sql_by_company',
+    id: 'slow_sql_count',
     name: 'Slow SQL by company',
-    description: 'RT0005 slow SQL events broken down by top 5 companies over time',
+    description: 'RT0005 slow SQL events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#378ADD',
     detailKql: _slowSqlDetail,
     kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0005'),
-  },
-  {
-    id: 'slow_al_by_company',
-    name: 'Slow AL by company',
-    description: 'RT0018 slow AL method events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#EF9F27',
-    detailKql: _slowAlDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0018'),
-  },
-  {
-    id: 'error_dialog_by_company',
-    name: 'Error dialogs by company',
-    description: 'RT0030 error dialog events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#E24B4A',
-    detailKql: _errorDialogDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0030'),
-  },
-  {
-    id: 'permission_errors_by_company',
-    name: 'Permission errors by company',
-    description: 'RT0031 permission error events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#D85A30',
-    detailKql: _permissionErrorDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0031'),
-  },
-  {
-    id: 'lock_timeouts_by_company',
-    name: 'Lock timeouts by company',
-    description: 'RT0012 lock timeout events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#885A89',
-    detailKql: _lockTimeoutDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0012'),
-  },
-  {
-    id: 'deadlocks_by_company',
-    name: 'Deadlocks by company',
-    description: 'RT0028 deadlock events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#D4537E',
-    detailKql: _deadlockDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0028'),
-  },
-  {
-    id: 'report_by_company',
-    name: 'Report rendering by company',
-    description: 'RT0006 report render events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#1D9E75',
-    detailKql: _reportDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0006'),
-  },
-  {
-    id: 'web_service_by_company',
-    name: 'Web service calls by company',
-    description: 'RT0008 incoming web service calls broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#639922',
-    detailKql: _webServiceDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0008'),
-  },
-
-  // ─── Slow SQL (RT0005) ────────────────────────────────────────────────────
-  {
-    id: 'slow_sql_count',
-    name: 'Slow SQL count over time',
-    description: 'Number of RT0005 slow SQL query events per time bucket',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#378ADD',
-    detailKql: _slowSqlDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0005'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
   },
   {
     id: 'slow_sql_avg_duration',
@@ -318,22 +227,13 @@ traces
   // ─── Slow AL method (RT0018) ─────────────────────────────────────────────
   {
     id: 'slow_al_count',
-    name: 'Slow AL count over time',
-    description: 'Number of RT0018 slow AL method events per time bucket',
+    name: 'Slow AL by company',
+    description: 'RT0018 slow AL method events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#EF9F27',
     detailKql: _slowAlDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0018'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0018'),
   },
   {
     id: 'slow_al_avg_duration',
@@ -385,22 +285,13 @@ traces
   // ─── Error dialogs (RT0030) ───────────────────────────────────────────────
   {
     id: 'error_dialog_count',
-    name: 'Error dialogs over time',
-    description: 'RT0030 error dialog shown events per bucket (actual user-facing errors)',
+    name: 'Error dialogs by company',
+    description: 'RT0030 error dialog events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#E24B4A',
     detailKql: _errorDialogDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0030'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0030'),
   },
   {
     id: 'errors_by_reason',
@@ -431,43 +322,25 @@ traces
   // ─── Permission errors (RT0031) ───────────────────────────────────────────
   {
     id: 'permission_errors',
-    name: 'Permission errors over time',
-    description: 'RT0031 permission error shown events per bucket',
+    name: 'Permission errors by company',
+    description: 'RT0031 permission error events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#D85A30',
     detailKql: _permissionErrorDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0031'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0031'),
   },
 
   // ─── Database lock timeouts (RT0012) ─────────────────────────────────────
   {
     id: 'lock_timeouts',
-    name: 'Lock timeouts over time',
-    description: 'RT0012 database lock timeout events per bucket — indicates contention between sessions',
+    name: 'Lock timeouts by company',
+    description: 'RT0012 lock timeout events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#885A89',
     detailKql: _lockTimeoutDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0012'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0012'),
   },
   {
     id: 'lock_timeouts_by_object',
@@ -498,43 +371,25 @@ traces
   // ─── Deadlocks (RT0028) ───────────────────────────────────────────────────
   {
     id: 'deadlocks',
-    name: 'Deadlocks over time',
-    description: 'RT0028 database deadlock occurred events per bucket',
+    name: 'Deadlocks by company',
+    description: 'RT0028 deadlock events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#D4537E',
     detailKql: _deadlockDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0028'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0028'),
   },
 
   // ─── Report rendering (RT0006) ────────────────────────────────────────────
   {
     id: 'report_rendering',
-    name: 'Report rendering over time',
-    description: 'RT0006 report render events (success + failure) per bucket',
+    name: 'Report rendering by company',
+    description: 'RT0006 report render events by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#1D9E75',
     detailKql: _reportDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
-| join kind=leftouter (
-    traces
-    | where timestamp >= ${tf}
-    | where tostring(customDimensions.eventId) == 'RT0006'
-    | summarize value=count() by bin(timestamp, ${bucket})
-) on timestamp
-| extend value = coalesce(value, long(0))
-| project timestamp, value
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0006'),
   },
   {
     id: 'report_avg_duration',
@@ -562,19 +417,13 @@ traces
   // ─── Web service calls (RT0008) ───────────────────────────────────────────
   {
     id: 'web_service_calls',
-    name: 'Incoming web service calls over time',
-    description: 'RT0008 web service calls (SOAP/OData) per bucket, split by protocol',
+    name: 'Web service calls by company',
+    description: 'RT0008 web service calls by top 5 companies; filtered to selected company when one is chosen',
     type: 'timeseries',
     defaultChartType: 'area',
     color: '#639922',
     detailKql: _webServiceDetail,
-    kql: (tf, bucket) => `traces
-| where timestamp >= ${tf}
-| where tostring(customDimensions.eventId) == 'RT0008'
-| extend protocol = tostring(customDimensions.category)
-| make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=protocol
-| mv-expand timestamp to typeof(datetime), value to typeof(long)
-| order by timestamp asc`,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0008'),
   },
 
   // ─── Metric (single number) queries ──────────────────────────────────────
@@ -794,15 +643,42 @@ export const VIEWS = [
   { id: 'web_services', label: 'Web Services', prefixes: ['web_service',   'metric_web_service'] },
 ];
 
+// Explicit preset → view membership. No runtime prefix matching.
+const PRESET_VIEW = {
+  slow_sql_count:            'slow_sql',
+  slow_sql_avg_duration:     'slow_sql',
+  slow_sql_by_object:        'slow_sql',
+  slow_al_count:             'slow_al',
+  slow_al_avg_duration:      'slow_al',
+  slow_al_by_object:         'slow_al',
+  error_dialog_count:        'errors',
+  errors_by_reason:          'errors',
+  permission_errors:         'permissions',
+  lock_timeouts:             'locking',
+  lock_timeouts_by_object:   'locking',
+  deadlocks:                 'locking',
+  report_rendering:          'reports',
+  report_avg_duration:       'reports',
+  web_service_calls:         'web_services',
+  metric_total_slow_sql:     'slow_sql',
+  metric_avg_sql_duration:   'slow_sql',
+  metric_p95_sql_duration:   'slow_sql',
+  metric_total_slow_al:      'slow_al',
+  metric_avg_al_duration:    'slow_al',
+  metric_p95_al_duration:    'slow_al',
+  metric_total_errors:       'errors',
+  metric_permission_errors:  'permissions',
+  metric_lock_timeout_count: 'locking',
+  metric_deadlock_count:     'locking',
+  metric_report_failures:    'reports',
+  metric_job_queue_errors:   'errors',
+  metric_web_service_calls:  'web_services',
+};
+
 export function boxInView(box, viewId) {
-  if (viewId === 'all') return true;
-  const view = VIEWS.find((v) => v.id === viewId);
-  if (!view?.prefixes) return true;
-  if (!box.presetId) {
-    // Custom box: match if explicitly assigned to this view, otherwise only in "All"
-    return box.viewId === viewId;
-  }
-  return view.prefixes.some((p) => box.presetId.startsWith(p));
+  if (!viewId || viewId === 'all') return true;
+  if (!box.presetId) return box.viewId === viewId;
+  return PRESET_VIEW[box.presetId] === viewId;
 }
 
 // Queries to fetch distinct tenant IDs and company names
@@ -831,7 +707,7 @@ export function injectFilters(kql, { tenantId, companyName }) {
   if (companyName) lines.push(`| where tostring(customDimensions.companyName) == '${companyName}'`);
   const filter = lines.join('\n');
   return kql.replace(
-    /(^\s*\|?\s*where\s+timestamp[^\n]*)/m,
+    /(^\s*\|?\s*where\s+timestamp[^\n]*)/gm,
     `$1\n${filter}`
   );
 }

@@ -6,6 +6,8 @@ export default function BoxList({ boxes, onToggle, onAdd, onReorder, views, acti
   const dragIndex = useRef(null);
   const [dragOver, setDragOver] = useState(null);
 
+  const displayed = activeView === 'all' ? boxes : boxes.filter((b) => boxInView(b, activeView));
+
   const handleDragStart = (i) => { dragIndex.current = i; };
 
   const handleDragOver = (e, i) => {
@@ -15,7 +17,11 @@ export default function BoxList({ boxes, onToggle, onAdd, onReorder, views, acti
 
   const handleDrop = (e, i) => {
     e.preventDefault();
-    if (dragIndex.current !== null && dragIndex.current !== i) onReorder(dragIndex.current, i);
+    if (dragIndex.current !== null && dragIndex.current !== i) {
+      const fromFull = boxes.indexOf(displayed[dragIndex.current]);
+      const toFull = boxes.indexOf(displayed[i]);
+      onReorder(fromFull, toFull);
+    }
     setDragOver(null);
     dragIndex.current = null;
   };
@@ -48,11 +54,11 @@ export default function BoxList({ boxes, onToggle, onAdd, onReorder, views, acti
         <span>Boxes</span>
         <button className="icon-btn" onClick={onAdd} title="Add box"><Plus size={16} /></button>
       </div>
-      {boxes.length === 0 && (
-        <p className="sidebar-empty">No boxes yet. Add one to get started.</p>
+      {displayed.length === 0 && (
+        <p className="sidebar-empty">{boxes.length === 0 ? 'No boxes yet. Add one to get started.' : 'No boxes in this view.'}</p>
       )}
       <ul className="sidebar-list">
-        {boxes.map((box, i) => (
+        {displayed.map((box, i) => (
           <li
             key={box.id}
             className={`sidebar-item ${!box.visible ? 'hidden' : ''} ${dragOver === i ? 'drag-over' : ''}`}
