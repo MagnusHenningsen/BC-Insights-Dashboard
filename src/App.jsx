@@ -22,8 +22,12 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const timerRef = useRef(null);
 
-  const { tenants, companies, loadingTenants, loadingCompanies } = useCompanies(settings, tenantId);
-  const hasCredentials = settings.appId && settings.apiKey;
+  const connections = settings.connections || [];
+  const activeConn = connections.find((c) => c.id === settings.activeConnectionId) || connections[0] || null;
+  const activeSettings = { ...settings, appId: activeConn?.appId || '', apiKey: activeConn?.apiKey || '' };
+  const hasCredentials = !!(activeSettings.appId && activeSettings.apiKey);
+
+  const { tenants, companies, loadingTenants, loadingCompanies } = useCompanies(activeSettings, tenantId);
 
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -32,6 +36,12 @@ export default function App() {
     }
     return () => clearInterval(timerRef.current);
   }, [settings.refreshInterval]);
+
+  const handleSwitchConnection = (connId) => {
+    setSettings({ activeConnectionId: connId });
+    setTenantId('');
+    setCompanyName('');
+  };
 
   const handleReset = () => {
     if (confirm('Reset dashboard to default layout? This will remove all custom boxes.')) {
@@ -53,6 +63,22 @@ export default function App() {
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
+
+          {connections.length > 1 && (
+            <div className="conn-tabs">
+              {connections.map((conn) => (
+                <button
+                  key={conn.id}
+                  className={`conn-tab${conn.id === activeConn?.id ? ' active' : ''}`}
+                  onClick={() => handleSwitchConnection(conn.id)}
+                  title={conn.appId}
+                >
+                  {conn.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <CompanyFilter
             tenantId={tenantId}
             onTenantChange={setTenantId}
@@ -99,7 +125,7 @@ export default function App() {
             <DashboardBox
               key={box.id}
               box={box}
-              settings={settings}
+              settings={activeSettings}
               timeRange={timeRange}
               tenantId={tenantId}
               companyName={companyName}
