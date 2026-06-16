@@ -3,7 +3,7 @@ import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { RefreshCw, Eye, EyeOff, Trash2, BarChart2, TrendingUp, Activity, Info } from 'lucide-react';
+import { RefreshCw, Eye, EyeOff, Trash2, BarChart2, TrendingUp, Activity, Info, Maximize2, X } from 'lucide-react';
 import { runKql, fmtMs, fmtNum } from '../lib/appInsights';
 import { PRESET_QUERIES, SERIES_COLORS, TIME_RANGES, injectFilters } from '../queries/presets';
 import BoxDetailModal from './BoxDetailModal';
@@ -44,7 +44,6 @@ function extractSeriesData(rows, type) {
     const val = row.value ?? row.Value ?? row.Count ?? row.count ?? Object.values(row)[0];
     return { kind: 'metric', value: val };
   }
-  // timeseries — detect if multi-series
   const hasSeriesCol = rows.some((r) => r.series !== undefined);
   if (hasSeriesCol) {
     const seriesNames = [...new Set(rows.map((r) => r.series))];
@@ -78,6 +77,91 @@ function MetricDisplay({ value, unit, color }) {
   );
 }
 
+const tooltipStyle = {
+  fontSize: 12,
+  background: 'var(--bg)',
+  border: '0.5px solid var(--border2)',
+  borderRadius: 'var(--radius)',
+  color: 'var(--text)',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+};
+
+function ChartContent({ data, chartType, color, boxId, height = 220 }) {
+  if (!data || (data.kind !== 'single' && data.kind !== 'multi')) return null;
+
+  const commonProps = { margin: { top: 4, right: 8, left: 0, bottom: 0 } };
+  const xAxis = <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />;
+  const yAxis = <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />;
+  const grid = <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />;
+  const tooltip = (
+    <Tooltip
+      labelFormatter={(l) => new Date(l).toLocaleString()}
+      contentStyle={tooltipStyle}
+      labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
+      itemStyle={{ color: 'var(--text)' }}
+      cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
+    />
+  );
+
+  if (chartType === 'bar') {
+    return (
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data.data} {...commonProps}>
+          {grid}{xAxis}{yAxis}{tooltip}
+          {data.kind === 'multi'
+            ? data.seriesNames.map((s, i) => <Bar key={s} dataKey={s} stackId="a" fill={SERIES_COLORS[i % SERIES_COLORS.length]} />)
+            : <Bar dataKey="value" fill={color} radius={[2,2,0,0]} />}
+          {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  if (chartType === 'area') {
+    const gradients = data.kind === 'multi'
+      ? data.seriesNames.map((s, i) => (
+        <linearGradient key={s} id={`grad-${boxId}-${i}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0.3} />
+          <stop offset="95%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0} />
+        </linearGradient>
+      ))
+      : (
+        <linearGradient id={`grad-${boxId}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+          <stop offset="95%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      );
+    return (
+      <ResponsiveContainer width="100%" height={height}>
+        <AreaChart data={data.data} {...commonProps}>
+          <defs>{gradients}</defs>
+          {grid}{xAxis}{yAxis}{tooltip}
+          {data.kind === 'multi'
+            ? data.seriesNames.map((s, i) => (
+              <Area key={s} type="monotone" dataKey={s} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} fill={`url(#grad-${boxId}-${i})`} strokeWidth={1.5} dot={false} />
+            ))
+            : <Area type="monotone" dataKey="value" stroke={color} fill={`url(#grad-${boxId})`} strokeWidth={1.5} dot={false} />}
+          {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data.data} {...commonProps}>
+        {grid}{xAxis}{yAxis}{tooltip}
+        {data.kind === 'multi'
+          ? data.seriesNames.map((s, i) => (
+            <Line key={s} type="monotone" dataKey={s} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} strokeWidth={1.5} dot={false} />
+          ))
+          : <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />}
+        {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 const CHART_ICONS = { line: TrendingUp, bar: BarChart2, area: Activity };
 
 export default function DashboardBox({ box, settings, timeRange, tenantId, companyName, refreshKey, onRemove, onToggle, onUpdateChartType }) {
@@ -86,6 +170,7 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
   const [error, setError] = useState(null);
   const [chartType, setChartType] = useState(box.chartType || 'line');
   const [showDetail, setShowDetail] = useState(false);
+  const [showExpanded, setShowExpanded] = useState(false);
   const [rawRows, setRawRows] = useState(null);
   const [builtKql, setBuiltKql] = useState(null);
   const [builtDetailKql, setBuiltDetailKql] = useState(null);
@@ -110,6 +195,13 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  useEffect(() => {
+    if (!showExpanded) return;
+    const handler = (e) => { if (e.key === 'Escape') setShowExpanded(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showExpanded]);
+
   const setChart = (type) => {
     setChartType(type);
     onUpdateChartType(type);
@@ -118,6 +210,7 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
   const color = box.color || SERIES_COLORS[0];
   const preset = box.presetId ? PRESET_QUERIES.find((q) => q.id === box.presetId) : null;
   const unit = preset?.unit || box.unit;
+  const hasChart = data && (data.kind === 'single' || data.kind === 'multi');
 
   return (
     <>
@@ -145,6 +238,11 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
               })}
             </div>
           )}
+          {box.type === 'timeseries' && hasChart && (
+            <button className="icon-btn" onClick={() => setShowExpanded(true)} title="Expand chart">
+              <Maximize2 size={15} />
+            </button>
+          )}
           <button className="icon-btn" onClick={() => setShowDetail(true)} title="Details / debug">
             <Info size={15} />
           </button>
@@ -164,122 +262,57 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
         {loading && !data && <div className="box-loading">Loading…</div>}
         {error && <div className="box-error">{error}</div>}
         {!error && data && (
-            <>
-              {data.kind === 'metric' && (
-                <MetricDisplay value={data.value} unit={unit} color={color} />
-              )}
-              {(data.kind === 'single' || data.kind === 'multi') && (
-                <ResponsiveContainer width="100%" height={220}>
-                  {chartType === 'bar' ? (
-                    <BarChart data={data.data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />
-                      <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />
-                      <Tooltip
-                        labelFormatter={(l) => new Date(l).toLocaleString()}
-                        contentStyle={{
-                          fontSize: 12,
-                          background: 'var(--bg)',
-                          border: '0.5px solid var(--border2)',
-                          borderRadius: 'var(--radius)',
-                          color: 'var(--text)',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-                        }}
-                        labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
-                        itemStyle={{ color: 'var(--text)' }}
-                        cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
-                      />
-                      {data.kind === 'multi' ? (
-                        data.seriesNames.map((s, i) => (
-                          <Bar key={s} dataKey={s} stackId="a" fill={SERIES_COLORS[i % SERIES_COLORS.length]} />
-                        ))
-                      ) : (
-                        <Bar dataKey="value" fill={color} radius={[2,2,0,0]} />
-                      )}
-                      {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                    </BarChart>
-                  ) : chartType === 'area' ? (
-                    <AreaChart data={data.data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <defs>
-                        {data.kind === 'multi'
-                          ? data.seriesNames.map((s, i) => (
-                            <linearGradient key={s} id={`grad-${box.id}-${i}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0.3} />
-                              <stop offset="95%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0} />
-                            </linearGradient>
-                          ))
-                          : (
-                            <linearGradient id={`grad-${box.id}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                              <stop offset="95%" stopColor={color} stopOpacity={0} />
-                            </linearGradient>
-                          )
-                        }
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />
-                      <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />
-                      <Tooltip
-                        labelFormatter={(l) => new Date(l).toLocaleString()}
-                        contentStyle={{
-                          fontSize: 12,
-                          background: 'var(--bg)',
-                          border: '0.5px solid var(--border2)',
-                          borderRadius: 'var(--radius)',
-                          color: 'var(--text)',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-                        }}
-                        labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
-                        itemStyle={{ color: 'var(--text)' }}
-                        cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
-                      />
-                      {data.kind === 'multi' ? (
-                        data.seriesNames.map((s, i) => (
-                          <Area key={s} type="monotone" dataKey={s} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} fill={`url(#grad-${box.id}-${i})`} strokeWidth={1.5} dot={false} />
-                        ))
-                      ) : (
-                        <Area type="monotone" dataKey="value" stroke={color} fill={`url(#grad-${box.id})`} strokeWidth={1.5} dot={false} />
-                      )}
-                      {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                    </AreaChart>
-                  ) : (
-                    <LineChart data={data.data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />
-                      <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />
-                      <Tooltip
-                        labelFormatter={(l) => new Date(l).toLocaleString()}
-                        contentStyle={{
-                          fontSize: 12,
-                          background: 'var(--bg)',
-                          border: '0.5px solid var(--border2)',
-                          borderRadius: 'var(--radius)',
-                          color: 'var(--text)',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-                        }}
-                        labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
-                        itemStyle={{ color: 'var(--text)' }}
-                        cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
-                      />
-                      {data.kind === 'multi' ? (
-                        data.seriesNames.map((s, i) => (
-                          <Line key={s} type="monotone" dataKey={s} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} strokeWidth={1.5} dot={false} />
-                        ))
-                      ) : (
-                        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
-                      )}
-                      {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                    </LineChart>
-                  )}
-                </ResponsiveContainer>
-              )}
-            </>
-          )}
+          <>
+            {data.kind === 'metric' && (
+              <MetricDisplay value={data.value} unit={unit} color={color} />
+            )}
+            {hasChart && (
+              <ChartContent data={data} chartType={chartType} color={color} boxId={box.id} height={220} />
+            )}
+          </>
+        )}
         {!loading && !error && !data && (
           <div className="box-empty">No data returned</div>
         )}
       </div>
     </div>
+
+    {showExpanded && (
+      <div className="chart-expand-backdrop" onClick={(e) => e.target === e.currentTarget && setShowExpanded(false)}>
+        <div className="chart-expand-modal">
+          <div className="chart-expand-header">
+            <div className="chart-expand-title-group">
+              <span className="chart-expand-title">{box.name}</span>
+              {box.description && <span className="chart-expand-desc">{box.description}</span>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div className="chart-toggle">
+                {['line', 'bar', 'area'].map((t) => {
+                  const Icon = CHART_ICONS[t];
+                  return (
+                    <button
+                      key={t}
+                      className={`icon-btn ${chartType === t ? 'active' : ''}`}
+                      onClick={() => setChart(t)}
+                      title={t}
+                    >
+                      <Icon size={15} />
+                    </button>
+                  );
+                })}
+              </div>
+              <button className="icon-btn" onClick={() => setShowExpanded(false)} title="Close">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+          <div className="chart-expand-body">
+            <ChartContent data={data} chartType={chartType} color={color} boxId={`${box.id}-exp`} height={480} />
+          </div>
+        </div>
+      </div>
+    )}
+
     {showDetail && (
       <BoxDetailModal
         box={box}

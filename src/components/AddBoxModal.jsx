@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Plus } from 'lucide-react';
-import { PRESET_QUERIES, CHART_TYPES } from '../queries/presets';
+import { PRESET_QUERIES, CHART_TYPES, VIEWS } from '../queries/presets';
 
 const DEFAULT_CUSTOM_KQL = `traces
 | where timestamp >= {timeFilter}
@@ -10,7 +10,9 @@ const DEFAULT_CUSTOM_KQL = `traces
 
 export default function AddBoxModal({ onAdd, onClose }) {
   const [mode, setMode] = useState('preset'); // 'preset' | 'custom'
-  const [presetId, setPresetId] = useState(PRESET_QUERIES[0].id);
+  const [presetId, setPresetId] = useState(
+    (PRESET_QUERIES.find((q) => q.id.endsWith('_by_company')) || PRESET_QUERIES[0]).id
+  );
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [chartType, setChartType] = useState('line');
@@ -18,6 +20,7 @@ export default function AddBoxModal({ onAdd, onClose }) {
   const [customKql, setCustomKql] = useState(DEFAULT_CUSTOM_KQL);
   const [customDetailKql, setCustomDetailKql] = useState('');
   const [color, setColor] = useState('#378ADD');
+  const [viewId, setViewId] = useState('');
 
   const selectedPreset = PRESET_QUERIES.find((q) => q.id === presetId);
 
@@ -42,6 +45,7 @@ export default function AddBoxModal({ onAdd, onClose }) {
         customKql: customKql.trim(),
         customDetailKql: customDetailKql.trim() || undefined,
         color,
+        viewId: viewId || undefined,
       });
     }
     onClose();
@@ -65,8 +69,13 @@ export default function AddBoxModal({ onAdd, onClose }) {
             <div className="field">
               <label>Preset query</label>
               <select value={presetId} onChange={(e) => setPresetId(e.target.value)}>
+                <optgroup label="By company">
+                  {PRESET_QUERIES.filter((q) => q.id.endsWith('_by_company')).map((q) => (
+                    <option key={q.id} value={q.id}>{q.name}</option>
+                  ))}
+                </optgroup>
                 <optgroup label="Time series">
-                  {PRESET_QUERIES.filter((q) => q.type === 'timeseries').map((q) => (
+                  {PRESET_QUERIES.filter((q) => q.type === 'timeseries' && !q.id.endsWith('_by_company')).map((q) => (
                     <option key={q.id} value={q.id}>{q.name}</option>
                   ))}
                 </optgroup>
@@ -129,6 +138,16 @@ export default function AddBoxModal({ onAdd, onClose }) {
                   style={{ fontFamily: 'monospace', fontSize: 12 }}
                   placeholder={`traces\n| where timestamp >= {timeFilter}\n| where tostring(customDimensions.eventId) == 'RT0005'\n| extend durMs = toreal(totimespan(customDimensions.executionTime)) / 10000\n| project timestamp, durMs, alObjectName\n| order by durMs desc\n| take 100`}
                 />
+              </div>
+              <div className="field">
+                <label>View <span className="optional">(optional)</span></label>
+                <select value={viewId} onChange={(e) => setViewId(e.target.value)}>
+                  <option value="">All (always visible)</option>
+                  {VIEWS.filter((v) => v.id !== 'all').map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+                <p className="field-hint">Which view this box appears in. Leave as "All" to always show it.</p>
               </div>
             </>
           )}

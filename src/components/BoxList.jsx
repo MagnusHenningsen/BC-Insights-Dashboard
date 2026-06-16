@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { Eye, EyeOff, Plus, GripVertical } from 'lucide-react';
+import { boxInView } from '../queries/presets';
 
-export default function BoxList({ boxes, onToggle, onAdd, onReorder }) {
+export default function BoxList({ boxes, onToggle, onAdd, onReorder, views, activeView, onViewChange }) {
   const dragIndex = useRef(null);
   const [dragOver, setDragOver] = useState(null);
 
@@ -9,16 +10,12 @@ export default function BoxList({ boxes, onToggle, onAdd, onReorder }) {
 
   const handleDragOver = (e, i) => {
     e.preventDefault();
-    if (dragIndex.current !== null && dragIndex.current !== i) {
-      setDragOver(i);
-    }
+    if (dragIndex.current !== null && dragIndex.current !== i) setDragOver(i);
   };
 
   const handleDrop = (e, i) => {
     e.preventDefault();
-    if (dragIndex.current !== null && dragIndex.current !== i) {
-      onReorder(dragIndex.current, i);
-    }
+    if (dragIndex.current !== null && dragIndex.current !== i) onReorder(dragIndex.current, i);
     setDragOver(null);
     dragIndex.current = null;
   };
@@ -30,6 +27,23 @@ export default function BoxList({ boxes, onToggle, onAdd, onReorder }) {
 
   return (
     <aside className="sidebar">
+      <div className="sidebar-header"><span>Views</span></div>
+      <nav className="view-nav">
+        {views.map((v) => {
+          const count = boxes.filter((b) => boxInView(b, v.id)).length;
+          return (
+            <button
+              key={v.id}
+              className={`view-nav-item${activeView === v.id ? ' active' : ''}`}
+              onClick={() => onViewChange(v.id)}
+            >
+              <span className="view-nav-label">{v.label}</span>
+              {count > 0 && <span className="view-nav-count">{count}</span>}
+            </button>
+          );
+        })}
+      </nav>
+
       <div className="sidebar-header">
         <span>Boxes</span>
         <button className="icon-btn" onClick={onAdd} title="Add box"><Plus size={16} /></button>

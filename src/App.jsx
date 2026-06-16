@@ -3,7 +3,7 @@ import { Settings, Plus, RefreshCw, RotateCcw } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import { useDashboard } from './hooks/useDashboard';
 import { useCompanies } from './hooks/useCompanies';
-import { TIME_RANGES } from './queries/presets';
+import { TIME_RANGES, VIEWS, boxInView } from './queries/presets';
 import DashboardBox from './components/DashboardBox';
 import AddBoxModal from './components/AddBoxModal';
 import SettingsPanel from './components/SettingsPanel';
@@ -20,6 +20,7 @@ export default function App() {
   const [tenantId, setTenantId] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeView, setActiveView] = useState('all');
   const timerRef = useRef(null);
 
   const connections = settings.connections || [];
@@ -110,7 +111,15 @@ export default function App() {
       </header>
 
       <div className="layout">
-        <BoxList boxes={boxes} onToggle={toggleBox} onAdd={() => setShowAdd(true)} onReorder={reorderBoxes} />
+        <BoxList
+            boxes={boxes}
+            onToggle={toggleBox}
+            onAdd={() => setShowAdd(true)}
+            onReorder={reorderBoxes}
+            views={VIEWS}
+            activeView={activeView}
+            onViewChange={setActiveView}
+          />
 
         <main className="grid">
           {boxes.length === 0 && (
@@ -121,7 +130,15 @@ export default function App() {
               </button>
             </div>
           )}
-          {boxes.filter((box) => box.visible).map((box) => (
+          {boxes.length > 0 && boxes.filter((b) => b.visible && boxInView(b, activeView)).length === 0 && (
+            <div className="empty-dashboard">
+              <p>No boxes in this view.</p>
+              <button className="btn-primary" onClick={() => setShowAdd(true)}>
+                <Plus size={15} /> Add a box
+              </button>
+            </div>
+          )}
+          {boxes.filter((box) => box.visible && boxInView(box, activeView)).map((box) => (
             <DashboardBox
               key={box.id}
               box={box}

@@ -166,6 +166,88 @@ traces
 | order by timestamp asc`;
 
 export const PRESET_QUERIES = [
+  // ─── By company ──────────────────────────────────────────────────────────
+  {
+    id: 'slow_sql_by_company',
+    name: 'Slow SQL by company',
+    description: 'RT0005 slow SQL events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#378ADD',
+    detailKql: _slowSqlDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0005'),
+  },
+  {
+    id: 'slow_al_by_company',
+    name: 'Slow AL by company',
+    description: 'RT0018 slow AL method events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#EF9F27',
+    detailKql: _slowAlDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0018'),
+  },
+  {
+    id: 'error_dialog_by_company',
+    name: 'Error dialogs by company',
+    description: 'RT0030 error dialog events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#E24B4A',
+    detailKql: _errorDialogDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0030'),
+  },
+  {
+    id: 'permission_errors_by_company',
+    name: 'Permission errors by company',
+    description: 'RT0031 permission error events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#D85A30',
+    detailKql: _permissionErrorDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0031'),
+  },
+  {
+    id: 'lock_timeouts_by_company',
+    name: 'Lock timeouts by company',
+    description: 'RT0012 lock timeout events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#885A89',
+    detailKql: _lockTimeoutDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0012'),
+  },
+  {
+    id: 'deadlocks_by_company',
+    name: 'Deadlocks by company',
+    description: 'RT0028 deadlock events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#D4537E',
+    detailKql: _deadlockDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0028'),
+  },
+  {
+    id: 'report_by_company',
+    name: 'Report rendering by company',
+    description: 'RT0006 report render events broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#1D9E75',
+    detailKql: _reportDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0006'),
+  },
+  {
+    id: 'web_service_by_company',
+    name: 'Web service calls by company',
+    description: 'RT0008 incoming web service calls broken down by top 5 companies over time',
+    type: 'timeseries',
+    defaultChartType: 'area',
+    color: '#639922',
+    detailKql: _webServiceDetail,
+    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0008'),
+  },
+
   // ─── Slow SQL (RT0005) ────────────────────────────────────────────────────
   {
     id: 'slow_sql_count',
@@ -231,17 +313,6 @@ traces
 | make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=obj
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`,
-  },
-
-  {
-    id: 'slow_sql_by_company',
-    name: 'Slow SQL by company',
-    description: 'RT0005 slow SQL events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#378ADD',
-    detailKql: _slowSqlDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0005'),
   },
 
   // ─── Slow AL method (RT0018) ─────────────────────────────────────────────
@@ -311,17 +382,6 @@ traces
 | order by timestamp asc`,
   },
 
-  {
-    id: 'slow_al_by_company',
-    name: 'Slow AL by company',
-    description: 'RT0018 slow AL method events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#EF9F27',
-    detailKql: _slowAlDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0018'),
-  },
-
   // ─── Error dialogs (RT0030) ───────────────────────────────────────────────
   {
     id: 'error_dialog_count',
@@ -368,17 +428,6 @@ traces
 | order by timestamp asc`,
   },
 
-  {
-    id: 'error_dialog_by_company',
-    name: 'Error dialogs by company',
-    description: 'RT0030 error dialog events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#E24B4A',
-    detailKql: _errorDialogDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0030'),
-  },
-
   // ─── Permission errors (RT0031) ───────────────────────────────────────────
   {
     id: 'permission_errors',
@@ -398,17 +447,6 @@ traces
 | extend value = coalesce(value, long(0))
 | project timestamp, value
 | order by timestamp asc`,
-  },
-
-  {
-    id: 'permission_errors_by_company',
-    name: 'Permission errors by company',
-    description: 'RT0031 permission error events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#D85A30',
-    detailKql: _permissionErrorDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0031'),
   },
 
   // ─── Database lock timeouts (RT0012) ─────────────────────────────────────
@@ -457,17 +495,6 @@ traces
 | order by timestamp asc`,
   },
 
-  {
-    id: 'lock_timeouts_by_company',
-    name: 'Lock timeouts by company',
-    description: 'RT0012 lock timeout events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#885A89',
-    detailKql: _lockTimeoutDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0012'),
-  },
-
   // ─── Deadlocks (RT0028) ───────────────────────────────────────────────────
   {
     id: 'deadlocks',
@@ -487,17 +514,6 @@ traces
 | extend value = coalesce(value, long(0))
 | project timestamp, value
 | order by timestamp asc`,
-  },
-
-  {
-    id: 'deadlocks_by_company',
-    name: 'Deadlocks by company',
-    description: 'RT0028 deadlock events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#D4537E',
-    detailKql: _deadlockDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0028'),
   },
 
   // ─── Report rendering (RT0006) ────────────────────────────────────────────
@@ -543,17 +559,6 @@ traces
 | order by timestamp asc`,
   },
 
-  {
-    id: 'report_by_company',
-    name: 'Report rendering by company',
-    description: 'RT0006 report render events broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#1D9E75',
-    detailKql: _reportDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0006'),
-  },
-
   // ─── Web service calls (RT0008) ───────────────────────────────────────────
   {
     id: 'web_service_calls',
@@ -570,17 +575,6 @@ traces
 | make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=protocol
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`,
-  },
-
-  {
-    id: 'web_service_by_company',
-    name: 'Web service calls by company',
-    description: 'RT0008 incoming web service calls broken down by top 5 companies over time',
-    type: 'timeseries',
-    defaultChartType: 'area',
-    color: '#639922',
-    detailKql: _webServiceDetail,
-    kql: (tf, bucket) => _byCompany(tf, bucket, 'RT0008'),
   },
 
   // ─── Metric (single number) queries ──────────────────────────────────────
@@ -788,6 +782,28 @@ export const SERIES_COLORS = [
   '#378ADD', '#EF9F27', '#1D9E75', '#D4537E',
   '#7F77DD', '#D85A30', '#639922', '#885A89',
 ];
+
+export const VIEWS = [
+  { id: 'all',          label: 'All' },
+  { id: 'slow_sql',     label: 'Slow SQL',     prefixes: ['slow_sql',     'metric_total_slow_sql', 'metric_avg_sql',  'metric_p95_sql']  },
+  { id: 'slow_al',      label: 'Slow AL',      prefixes: ['slow_al',      'metric_total_slow_al',  'metric_avg_al',   'metric_p95_al']   },
+  { id: 'errors',       label: 'Errors',       prefixes: ['error_dialog',  'errors_by',             'metric_total_errors', 'metric_job_queue'] },
+  { id: 'permissions',  label: 'Permissions',  prefixes: ['permission',    'metric_permission']  },
+  { id: 'locking',      label: 'Locking',      prefixes: ['lock_timeout',  'deadlock',             'metric_lock',     'metric_deadlock'] },
+  { id: 'reports',      label: 'Reports',      prefixes: ['report',        'metric_report']      },
+  { id: 'web_services', label: 'Web Services', prefixes: ['web_service',   'metric_web_service'] },
+];
+
+export function boxInView(box, viewId) {
+  if (viewId === 'all') return true;
+  const view = VIEWS.find((v) => v.id === viewId);
+  if (!view?.prefixes) return true;
+  if (!box.presetId) {
+    // Custom box: match if explicitly assigned to this view, otherwise only in "All"
+    return box.viewId === viewId;
+  }
+  return view.prefixes.some((p) => box.presetId.startsWith(p));
+}
 
 // Queries to fetch distinct tenant IDs and company names
 export const TENANT_LIST_KQL = `traces
