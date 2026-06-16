@@ -1,0 +1,298 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import { RefreshCw, Eye, EyeOff, Trash2, BarChart2, TrendingUp, Activity, Info } from 'lucide-react';
+import { runKql, fmtMs, fmtNum } from '../lib/appInsights';
+import { PRESET_QUERIES, SERIES_COLORS, TIME_RANGES, injectFilters } from '../queries/presets';
+import BoxDetailModal from './BoxDetailModal';
+
+function buildDetailKql(box, timeFilter, tenantId, companyName) {
+  let kql;
+  if (box.presetId) {
+    const preset = PRESET_QUERIES.find((q) => q.id === box.presetId);
+    if (!preset?.detailKql) return null;
+    kql = preset.detailKql(timeFilter);
+  } else if (box.customDetailKql) {
+    kql = box.customDetailKql.replace(/\{timeFilter\}/g, timeFilter);
+  } else {
+    return null;
+  }
+  return injectFilters(kql, { tenantId, companyName });
+}
+
+function buildKql(box, timeFilter, bucket, tenantId, companyName) {
+  let kql;
+  if (box.presetId) {
+    const preset = PRESET_QUERIES.find((q) => q.id === box.presetId);
+    if (!preset) return null;
+    kql = preset.type === 'timeseries'
+      ? preset.kql(timeFilter, bucket)
+      : preset.kql(timeFilter);
+  } else {
+    kql = (box.customKql || '')
+      .replace(/\{timeFilter\}/g, timeFilter)
+      .replace(/\{bucket\}/g, bucket);
+  }
+  return injectFilters(kql, { tenantId, companyName });
+}
+
+function extractSeriesData(rows, type) {
+  if (type === 'metric') {
+    const row = rows[0] || {};
+    const val = row.value ?? row.Value ?? row.Count ?? row.count ?? Object.values(row)[0];
+    return { kind: 'metric', value: val };
+  }
+  // timeseries — detect if multi-series
+  const hasSeriesCol = rows.some((r) => r.series !== undefined);
+  if (hasSeriesCol) {
+    const seriesNames = [...new Set(rows.map((r) => r.series))];
+    const timeMap = {};
+    rows.forEach((r) => {
+      const ts = r.timestamp;
+      if (!timeMap[ts]) timeMap[ts] = { timestamp: ts };
+      timeMap[ts][r.series] = r.value;
+    });
+    return { kind: 'multi', seriesNames, data: Object.values(timeMap).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)) };
+  }
+  const data = rows.map((r) => ({
+    timestamp: r.timestamp,
+    value: r.value ?? r.Value ?? Object.values(r).find((v) => typeof v === 'number'),
+  })).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  return { kind: 'single', data };
+}
+
+function fmtTimestamp(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function MetricDisplay({ value, unit, color }) {
+  const isMs = unit === 'ms';
+  const display = isMs ? fmtMs(value) : fmtNum(value);
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '24px 0' }}>
+      <span style={{ fontSize: 56, fontWeight: 500, color, lineHeight: 1 }}>{display}</span>
+    </div>
+  );
+}
+
+const CHART_ICONS = { line: TrendingUp, bar: BarChart2, area: Activity };
+
+export default function DashboardBox({ box, settings, timeRange, tenantId, companyName, refreshKey, onRemove, onToggle, onUpdateChartType }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [chartType, setChartType] = useState(box.chartType || 'line');
+  const [showDetail, setShowDetail] = useState(false);
+  const [rawRows, setRawRows] = useState(null);
+  const [builtKql, setBuiltKql] = useState(null);
+  const [builtDetailKql, setBuiltDetailKql] = useState(null);
+
+  const tr = TIME_RANGES.find((t) => t.value === timeRange) || TIME_RANGES[2];
+
+  const fetch = useCallback(async () => {
+    if (!settings.appId || !settings.apiKey) { setError('No credentials'); return; }
+    setLoading(true); setError(null);
+    try {
+      const kql = buildKql(box, `ago(${tr.value})`, tr.bucket, tenantId, companyName);
+      if (!kql) throw new Error('Invalid query config');
+      setBuiltKql(kql);
+      setBuiltDetailKql(buildDetailKql(box, `ago(${tr.value})`, tenantId, companyName));
+      const rows = await runKql({ appId: settings.appId, apiKey: settings.apiKey, query: kql });
+      setRawRows(rows);
+      setData(extractSeriesData(rows, box.type));
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box.id, box.presetId, box.customKql, box.customDetailKql, box.type, settings.appId, settings.apiKey, tr, tenantId, companyName, refreshKey]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const setChart = (type) => {
+    setChartType(type);
+    onUpdateChartType(type);
+  };
+
+  const color = box.color || SERIES_COLORS[0];
+  const preset = box.presetId ? PRESET_QUERIES.find((q) => q.id === box.presetId) : null;
+  const unit = preset?.unit || box.unit;
+
+  return (
+    <>
+    <div className="box">
+      <div className="box-header">
+        <div className="box-title-group">
+          <span className="box-title">{box.name}</span>
+          {box.description && <span className="box-desc">{box.description}</span>}
+        </div>
+        <div className="box-controls">
+          {box.type === 'timeseries' && (
+            <div className="chart-toggle">
+              {['line', 'bar', 'area'].map((t) => {
+                const Icon = CHART_ICONS[t];
+                return (
+                  <button
+                    key={t}
+                    className={`icon-btn ${chartType === t ? 'active' : ''}`}
+                    onClick={() => setChart(t)}
+                    title={t}
+                  >
+                    <Icon size={15} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <button className="icon-btn" onClick={() => setShowDetail(true)} title="Details / debug">
+            <Info size={15} />
+          </button>
+          <button className="icon-btn" onClick={fetch} title="Refresh" disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'spinning' : ''} />
+          </button>
+          <button className="icon-btn" onClick={onToggle} title={box.visible ? 'Hide' : 'Show'}>
+            {box.visible ? <Eye size={15} /> : <EyeOff size={15} />}
+          </button>
+          <button className="icon-btn danger" onClick={onRemove} title="Remove">
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="box-body">
+        {loading && !data && <div className="box-loading">Loading…</div>}
+        {error && <div className="box-error">{error}</div>}
+        {!error && data && (
+            <>
+              {data.kind === 'metric' && (
+                <MetricDisplay value={data.value} unit={unit} color={color} />
+              )}
+              {(data.kind === 'single' || data.kind === 'multi') && (
+                <ResponsiveContainer width="100%" height={220}>
+                  {chartType === 'bar' ? (
+                    <BarChart data={data.data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />
+                      <Tooltip
+                        labelFormatter={(l) => new Date(l).toLocaleString()}
+                        contentStyle={{
+                          fontSize: 12,
+                          background: 'var(--bg)',
+                          border: '0.5px solid var(--border2)',
+                          borderRadius: 'var(--radius)',
+                          color: 'var(--text)',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+                        }}
+                        labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
+                        itemStyle={{ color: 'var(--text)' }}
+                        cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
+                      />
+                      {data.kind === 'multi' ? (
+                        data.seriesNames.map((s, i) => (
+                          <Bar key={s} dataKey={s} stackId="a" fill={SERIES_COLORS[i % SERIES_COLORS.length]} />
+                        ))
+                      ) : (
+                        <Bar dataKey="value" fill={color} radius={[2,2,0,0]} />
+                      )}
+                      {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                    </BarChart>
+                  ) : chartType === 'area' ? (
+                    <AreaChart data={data.data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                      <defs>
+                        {data.kind === 'multi'
+                          ? data.seriesNames.map((s, i) => (
+                            <linearGradient key={s} id={`grad-${box.id}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0.3} />
+                              <stop offset="95%" stopColor={SERIES_COLORS[i % SERIES_COLORS.length]} stopOpacity={0} />
+                            </linearGradient>
+                          ))
+                          : (
+                            <linearGradient id={`grad-${box.id}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                              <stop offset="95%" stopColor={color} stopOpacity={0} />
+                            </linearGradient>
+                          )
+                        }
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />
+                      <Tooltip
+                        labelFormatter={(l) => new Date(l).toLocaleString()}
+                        contentStyle={{
+                          fontSize: 12,
+                          background: 'var(--bg)',
+                          border: '0.5px solid var(--border2)',
+                          borderRadius: 'var(--radius)',
+                          color: 'var(--text)',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+                        }}
+                        labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
+                        itemStyle={{ color: 'var(--text)' }}
+                        cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
+                      />
+                      {data.kind === 'multi' ? (
+                        data.seriesNames.map((s, i) => (
+                          <Area key={s} type="monotone" dataKey={s} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} fill={`url(#grad-${box.id}-${i})`} strokeWidth={1.5} dot={false} />
+                        ))
+                      ) : (
+                        <Area type="monotone" dataKey="value" stroke={color} fill={`url(#grad-${box.id})`} strokeWidth={1.5} dot={false} />
+                      )}
+                      {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                    </AreaChart>
+                  ) : (
+                    <LineChart data={data.data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="timestamp" tickFormatter={fmtTimestamp} tick={{ fontSize: 11, fill: 'var(--text3)' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} width={40} />
+                      <Tooltip
+                        labelFormatter={(l) => new Date(l).toLocaleString()}
+                        contentStyle={{
+                          fontSize: 12,
+                          background: 'var(--bg)',
+                          border: '0.5px solid var(--border2)',
+                          borderRadius: 'var(--radius)',
+                          color: 'var(--text)',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+                        }}
+                        labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
+                        itemStyle={{ color: 'var(--text)' }}
+                        cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
+                      />
+                      {data.kind === 'multi' ? (
+                        data.seriesNames.map((s, i) => (
+                          <Line key={s} type="monotone" dataKey={s} stroke={SERIES_COLORS[i % SERIES_COLORS.length]} strokeWidth={1.5} dot={false} />
+                        ))
+                      ) : (
+                        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
+                      )}
+                      {data.kind === 'multi' && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                    </LineChart>
+                  )}
+                </ResponsiveContainer>
+              )}
+            </>
+          )}
+        {!loading && !error && !data && (
+          <div className="box-empty">No data returned</div>
+        )}
+      </div>
+    </div>
+    {showDetail && (
+      <BoxDetailModal
+        box={box}
+        kql={builtKql}
+        detailKql={builtDetailKql}
+        rawRows={rawRows}
+        settings={settings}
+        tr={tr}
+        tenantId={tenantId}
+        companyName={companyName}
+        onClose={() => setShowDetail(false)}
+      />
+    )}
+    </>
+  );
+}
