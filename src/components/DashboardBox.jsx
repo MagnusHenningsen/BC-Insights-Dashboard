@@ -98,7 +98,6 @@ function ChartContent({ data, chartType, color, boxId, height = 220 }) {
       labelFormatter={(l) => new Date(l).toLocaleString()}
       contentStyle={tooltipStyle}
       labelStyle={{ color: 'var(--text2)', marginBottom: 4, fontWeight: 500 }}
-      itemStyle={{ color: 'var(--text)' }}
       cursor={{ stroke: 'var(--border2)', strokeWidth: 1 }}
     />
   );
