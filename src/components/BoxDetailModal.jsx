@@ -2,6 +2,78 @@ import { useState, useEffect } from 'react';
 import { X, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { runKql } from '../lib/appInsights';
 
+function parseObj(val) {
+  if (val && typeof val === 'object') return val;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return null; }
+  }
+  return null;
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const copy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button className="icon-btn small" onClick={copy} title={copied ? 'Copied!' : 'Copy'} style={{ padding: '1px 5px' }}>
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+    </button>
+  );
+}
+
+function CustomDimensionsValue({ val }) {
+  const [open, setOpen] = useState(false);
+  const obj = parseObj(val);
+  if (!obj) {
+    const s = String(val ?? '');
+    return s.length > 80 ? <pre className="row-kv-val-pre">{s}</pre> : <span className="row-kv-val">{s}</span>;
+  }
+  const entries = Object.entries(obj).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  return (
+    <div>
+      <button
+        className="icon-btn small"
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: open ? 6 : 0 }}
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span style={{ fontSize: 11 }}>{entries.length} properties</span>
+      </button>
+      {open && (
+        <div className="row-kv-grid" style={{ marginTop: 4, paddingLeft: 10, borderLeft: '2px solid var(--border2)' }}>
+          {entries.map(([k, v]) => {
+            const strVal = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v ?? '');
+            const isStackTrace = k === 'alStackTrace';
+            const isLong = isStackTrace || strVal.length > 80 || strVal.includes('\n');
+            return (
+              <div key={k} className={`row-kv-item${isLong ? ' row-kv-item-wide' : ''}`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className="row-kv-key">{k}</span>
+                  {isStackTrace && strVal && <CopyButton text={strVal} />}
+                </div>
+                {isLong ? <pre className="row-kv-val-pre">{strVal}</pre> : <span className="row-kv-val">{strVal}</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function cellDisplay(col, val) {
+  if (col === 'customDimensions') {
+    const obj = parseObj(val);
+    return obj ? `{ ${Object.keys(obj).length} props }` : String(val ?? '');
+  }
+  if (val !== null && val !== undefined && typeof val === 'object') return '{…}';
+  return String(val ?? '');
+}
+
 function ResultTable({ rows }) {
   const [expanded, setExpanded] = useState(null);
   const cols = rows.length > 0 ? Object.keys(rows[0]) : [];
@@ -39,20 +111,33 @@ function ExpandableRow({ row, cols, isExpanded, onToggle }) {
         <td className="detail-row-chevron">
           {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </td>
-        {cols.map((c) => (
-          <td key={c} title={String(row[c] ?? '')}>{String(row[c] ?? '')}</td>
-        ))}
+        {cols.map((c) => {
+          const display = cellDisplay(c, row[c]);
+          return <td key={c} title={display}>{display}</td>;
+        })}
       </tr>
       {isExpanded && (
         <tr className="detail-row-expanded">
           <td colSpan={cols.length + 1}>
             <div className="row-kv-grid">
               {cols.map((c) => {
+                if (c === 'customDimensions') {
+                  return (
+                    <div key={c} className="row-kv-item row-kv-item-wide">
+                      <span className="row-kv-key">{c}</span>
+                      <CustomDimensionsValue val={row[c]} />
+                    </div>
+                  );
+                }
                 const val = String(row[c] ?? '');
-                const isLong = val.length > 80 || val.includes('\n');
+                const isStackTrace = c === 'alStackTrace';
+                const isLong = isStackTrace || val.length > 80 || val.includes('\n');
                 return (
                   <div key={c} className={`row-kv-item${isLong ? ' row-kv-item-wide' : ''}`}>
-                    <span className="row-kv-key">{c}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="row-kv-key">{c}</span>
+                      {isStackTrace && val && <CopyButton text={val} />}
+                    </div>
                     {isLong
                       ? <pre className="row-kv-val-pre">{val}</pre>
                       : <span className="row-kv-val">{val}</span>

@@ -218,7 +218,8 @@ body {
 }
 .icon-btn:hover { background: var(--bg2); color: var(--text); }
 .icon-btn.active { background: var(--bg2); color: var(--text); }
-.icon-btn.danger:hover { color: var(--danger); }
+.icon-btn.danger { color: var(--danger); }
+.icon-btn.danger:hover { background: var(--danger-bg); color: var(--danger); }
 .icon-btn.small { padding: 3px; }
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

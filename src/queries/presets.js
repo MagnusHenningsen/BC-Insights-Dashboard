@@ -19,7 +19,7 @@ const _slowSqlDetail = (tf) => `traces
     clientType = tostring(customDimensions.clientType),
     companyName = tostring(customDimensions.companyName),
     sqlStatement = tostring(customDimensions.sqlStatement)
-| project timestamp, durMs, alObjectName, alObjectType, extensionName, clientType, companyName, sqlStatement
+| project timestamp, durMs, alObjectName, alObjectType, extensionName, clientType, companyName, sqlStatement, customDimensions
 | order by durMs desc
 | take 100`;
 
@@ -34,7 +34,7 @@ const _slowAlDetail = (tf) => `traces
     clientType = tostring(customDimensions.clientType),
     companyName = tostring(customDimensions.companyName),
     alStackTrace = tostring(customDimensions.alStackTrace)
-| project timestamp, durMs, alObjectName, alObjectType, extensionName, clientType, companyName, alStackTrace
+| project timestamp, durMs, alObjectName, alObjectType, extensionName, clientType, companyName, alStackTrace, customDimensions
 | order by durMs desc
 | take 100`;
 
@@ -49,7 +49,7 @@ const _errorDialogDetail = (tf) => `traces
     clientType = tostring(customDimensions.clientType),
     companyName = tostring(customDimensions.companyName),
     alStackTrace = tostring(customDimensions.alStackTrace)
-| project timestamp, failureReason, alObjectName, alObjectType, extensionName, clientType, companyName, alStackTrace
+| project timestamp, failureReason, alObjectName, alObjectType, extensionName, clientType, companyName, alStackTrace, customDimensions
 | order by timestamp desc
 | take 100`;
 
@@ -64,7 +64,7 @@ const _permissionErrorDetail = (tf) => `traces
     clientType = tostring(customDimensions.clientType),
     companyName = tostring(customDimensions.companyName),
     userTelemetryId = tostring(customDimensions.usertelemetryid)
-| project timestamp, permissionObjectType, permissionObjectId, permissionObjectName, alObjectName, clientType, companyName, userTelemetryId
+| project timestamp, permissionObjectType, permissionObjectId, permissionObjectName, alObjectName, clientType, companyName, userTelemetryId, customDimensions
 | order by timestamp desc
 | take 100`;
 
@@ -80,7 +80,7 @@ const _lockTimeoutDetail = (tf) => `traces
     snapshotId = tostring(customDimensions.snapshotId),
     sqlStatement = tostring(customDimensions.sqlStatement),
     alStackTrace = tostring(customDimensions.alStackTrace)
-| project timestamp, alObjectName, alObjectType, extensionName, clientType, companyName, snapshotId, sqlStatement, alStackTrace
+| project timestamp, alObjectName, alObjectType, extensionName, clientType, companyName, snapshotId, sqlStatement, alStackTrace, customDimensions
 | order by timestamp desc
 | take 100`;
 
@@ -102,7 +102,7 @@ const _deadlockDetail = (tf) => `traces
     waitResource = extract(@'waitresource="([^"]+)"', 1, deadlockGraph),
     allSql = strcat_array(extract_all(@'<inputbuf>([^<]+)</inputbuf>', deadlockGraph), ' || ')
 | project timestamp, alObjectName, alObjectType, extensionName, clientType, companyName,
-    sqlStatement, lockedObjects, lockedIndexes, waitResource, allSql, deadlockGraph, alStackTrace
+    sqlStatement, lockedObjects, lockedIndexes, waitResource, allSql, deadlockGraph, alStackTrace, customDimensions
 | order by timestamp desc
 | take 100`;
 
@@ -117,7 +117,7 @@ const _reportDetail = (tf) => `traces
     extensionName = tostring(customDimensions.extensionName),
     clientType = tostring(customDimensions.clientType),
     companyName = tostring(customDimensions.companyName)
-| project timestamp, reportName, reportId, result, durMs, extensionName, clientType, companyName
+| project timestamp, reportName, reportId, result, durMs, extensionName, clientType, companyName, customDimensions
 | order by timestamp desc
 | take 100`;
 
@@ -130,7 +130,7 @@ const _webServiceDetail = (tf) => `traces
     httpStatusCode = tostring(customDimensions.httpStatusCode),
     durMs = toreal(totimespan(customDimensions.serverExecutionTime)) / 10000,
     companyName = tostring(customDimensions.companyName)
-| project timestamp, category, endpointName, httpStatusCode, durMs, companyName
+| project timestamp, category, endpointName, httpStatusCode, durMs, companyName, customDimensions
 | order by timestamp desc
 | take 100`;
 
@@ -143,7 +143,7 @@ const _jobQueueErrorDetail = (tf) => `traces
     isRecurring = tostring(customDimensions.alJobQueueIsRecurring),
     scheduledTaskId = tostring(customDimensions.alJobQueueScheduledTaskId),
     companyName = tostring(customDimensions.companyName)
-| project timestamp, jobDescription, jobCategoryCode, isRecurring, scheduledTaskId, companyName
+| project timestamp, jobDescription, jobCategoryCode, isRecurring, scheduledTaskId, companyName, customDimensions
 | order by timestamp desc
 | take 100`;
 

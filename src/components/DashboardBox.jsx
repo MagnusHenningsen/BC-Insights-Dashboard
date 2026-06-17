@@ -248,7 +248,7 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
           <button className="icon-btn" onClick={fetch} title="Refresh" disabled={loading}>
             <RefreshCw size={15} className={loading ? 'spinning' : ''} />
           </button>
-          <button className="icon-btn" onClick={onToggle} title={box.visible ? 'Hide' : 'Show'}>
+          <button className="icon-btn danger" onClick={onToggle} title={box.visible ? 'Hide' : 'Show'}>
             {box.visible ? <Eye size={15} /> : <EyeOff size={15} />}
           </button>
           <button className="icon-btn danger" onClick={onRemove} title="Remove">
