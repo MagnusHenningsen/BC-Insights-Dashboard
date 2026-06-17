@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { RefreshCw, Eye, EyeOff, Trash2, BarChart2, TrendingUp, Activity, Info, Maximize2, X, Pencil } from 'lucide-react';
 import { runKql, fmtMs, fmtNum } from '../lib/appInsights';
-import { PRESET_QUERIES, SERIES_COLORS, TIME_RANGES, injectFilters } from '../queries/presets';
+import { PRESET_QUERIES, SERIES_COLORS, TIME_RANGES, BUCKET_OPTIONS, injectFilters } from '../queries/presets';
 import BoxDetailModal from './BoxDetailModal';
 import EditBoxModal from './EditBoxModal';
 
@@ -184,7 +184,7 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
     if (!settings.appId || !settings.apiKey) { setError('No credentials'); return; }
     setLoading(true); setError(null);
     try {
-      const kql = buildKql(box, `ago(${tr.value})`, tr.bucket, tenantId, companyName);
+      const kql = buildKql(box, `ago(${tr.value})`, box.bucket || tr.bucket, tenantId, companyName);
       if (!kql) throw new Error('Invalid query config');
       setBuiltKql(kql);
       setBuiltDetailKql(buildDetailKql(box, `ago(${tr.value})`, tenantId, companyName));
@@ -194,7 +194,7 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
     } catch (e) { setError(e.message); }
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [box.id, box.presetId, box.customKql, box.customDetailKql, box.type, settings.appId, settings.apiKey, tr, tenantId, companyName, refreshKey]);
+  }, [box.id, box.presetId, box.customKql, box.customDetailKql, box.type, box.bucket, settings.appId, settings.apiKey, tr, tenantId, companyName, refreshKey]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -224,6 +224,19 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
           {box.description && <span className="box-desc">{box.description}</span>}
         </div>
         <div className="box-controls">
+          {box.type === 'timeseries' && (
+            <select
+              className="time-select"
+              style={{ fontSize: 11, padding: '3px 6px' }}
+              value={box.bucket || ''}
+              onChange={(e) => onUpdate({ bucket: e.target.value || undefined })}
+              title="Time bucket"
+            >
+              {BUCKET_OPTIONS.map((b) => (
+                <option key={b.value} value={b.value}>{b.value ? b.label : 'Auto bucket'}</option>
+              ))}
+            </select>
+          )}
           {box.type === 'timeseries' && (
             <div className="chart-toggle">
               {['line', 'bar', 'area'].map((t) => {

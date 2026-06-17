@@ -1,6 +1,151 @@
 import { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Copy, Check } from 'lucide-react';
 import { PRESET_QUERIES, CHART_TYPES, VIEWS } from '../queries/presets';
+
+const PROMPT_TEMPLATE = `You are helping me add a new box to a Business Central telemetry dashboard.
+The dashboard queries Microsoft Application Insights via KQL (Kusto Query Language).
+
+== WHAT TO PRODUCE ==
+Give me a box configuration in the exact OUTPUT FORMAT at the bottom.
+I will paste each field directly into the dashboard UI.
+
+== BOX FIELDS ==
+- Name: display name shown on the box
+- Description: one-line subtitle shown under the name
+- Type: "timeseries" (graph over time) or "metric" (single number)
+- Chart type (timeseries only): "line", "bar", or "area"
+- Color: a hex color code for the series
+- KQL query: the main chart/metric query (see format below)
+- Detail query: optional record-level drill-down query (see format below)
+
+== KQL PLACEHOLDERS ==
+Always use these placeholders — the dashboard substitutes the real values at runtime:
+  {timeFilter}  →  the time range expression, e.g. ago(24h)
+  {bucket}      →  the time bucket for aggregation, e.g. 1h  (timeseries only)
+
+Example time filter usage:  | where timestamp >= {timeFilter}
+Example bucket usage:       | summarize value=count() by bin(timestamp, {bucket})
+
+== TIMESERIES QUERY REQUIREMENTS ==
+Must return columns:
+  timestamp  (datetime)
+  value      (number)
+  series     (string, optional — use for multi-line charts, one line per distinct value)
+
+Single-series example:
+  traces
+  | where timestamp >= {timeFilter}
+  | where tostring(customDimensions.eventId) == 'RT0005'
+  | summarize value=count() by bin(timestamp, {bucket})
+  | order by timestamp asc
+
+Multi-series by company (top 5):
+  let topCompanies = traces
+  | where timestamp >= {timeFilter}
+  | where tostring(customDimensions.eventId) == 'RT0005'
+  | summarize cnt=count() by company=tostring(customDimensions.companyName)
+  | top 5 by cnt desc | project company;
+  traces
+  | where timestamp >= {timeFilter}
+  | where tostring(customDimensions.eventId) == 'RT0005'
+  | extend company = tostring(customDimensions.companyName)
+  | where company in (topCompanies)
+  | make-series value=count() default=0 on timestamp
+      from bin({timeFilter}, {bucket}) to now() step {bucket} by series=company
+  | mv-expand timestamp to typeof(datetime), value to typeof(long)
+  | order by timestamp asc
+
+== METRIC QUERY REQUIREMENTS ==
+Must return a single row with a numeric column named "value".
+Example:
+  traces
+  | where timestamp >= {timeFilter}
+  | where tostring(customDimensions.eventId) == 'RT0005'
+  | count
+  | project value=Count
+
+== DETAIL QUERY REQUIREMENTS ==
+Record-level query shown in a drill-down tab. Uses {timeFilter} only (no {bucket}).
+Return individual rows ordered by relevance. Always include customDimensions last.
+Example:
+  traces
+  | where timestamp >= {timeFilter}
+  | where tostring(customDimensions.eventId) == 'RT0005'
+  | extend
+      durMs = toreal(totimespan(customDimensions.executionTime)) / 10000,
+      companyName = tostring(customDimensions.companyName),
+      alObjectName = tostring(customDimensions.alObjectName)
+  | project timestamp, durMs, companyName, alObjectName, customDimensions
+  | order by durMs desc
+  | take 100
+
+== TIMESPAN FIELDS ==
+These customDimensions fields are stored as TIMESPAN (hh:mm:ss.fffffff), not numbers.
+Convert to milliseconds with:  toreal(totimespan(customDimensions.executionTime)) / 10000
+Fields:  executionTime (RT0005, RT0018),  totalTime (RT0006),  serverExecutionTime (RT0008)
+
+== AVAILABLE BC TELEMETRY EVENT IDs ==
+RT0005  Slow SQL query
+  customDimensions: executionTime*, sqlStatement, alObjectName, alObjectType,
+                    extensionName, clientType, companyName
+
+RT0006  Report rendering completed
+  customDimensions: totalTime*, alObjectName (report name), alObjectId,
+                    result, extensionName, clientType, companyName
+
+RT0008  Web service request
+  customDimensions: serverExecutionTime*, endpointName, category,
+                    httpStatusCode, companyName
+
+RT0012  Database lock timeout
+  customDimensions: alObjectName, alObjectType, extensionName, clientType,
+                    companyName, snapshotId, sqlStatement, alStackTrace
+
+RT0018  Slow AL method execution
+  customDimensions: executionTime*, alObjectName, alObjectType, extensionName,
+                    clientType, companyName, alStackTrace
+
+RT0028  Deadlock
+  customDimensions: alObjectName, alObjectType, extensionName, clientType,
+                    companyName, sqlStatement, deadlockGraph, alStackTrace
+
+RT0030  Error dialog shown to user
+  customDimensions: failureReason, alObjectName, alObjectType, extensionName,
+                    clientType, companyName, alStackTrace
+
+RT0031  Permission error
+  customDimensions: permissionObjectType, permissionObjectId,
+                    permissionObjectName, alObjectName, clientType,
+                    companyName, usertelemetryid
+
+AL0000HE7  Job queue entry error
+  customDimensions: alJobQueueObjectDescription, alJobQueueCategoryCode,
+                    alJobQueueIsRecurring, alJobQueueScheduledTaskId, companyName
+
+  * = TIMESPAN field, convert with toreal(totimespan(...)) / 10000 for ms
+
+== OUTPUT FORMAT ==
+Respond with only this block — no extra explanation:
+
+Name: <name>
+Description: <description>
+Type: <timeseries|metric>
+Chart type: <line|bar|area>
+Color: <#hex>
+
+KQL query:
+\`\`\`kql
+<main query>
+\`\`\`
+
+Detail query:
+\`\`\`kql
+<detail query, or write "none">
+\`\`\`
+
+== MY REQUEST ==
+<describe what you want to track here>`;
+
 
 const DEFAULT_CUSTOM_KQL = `traces
 | where timestamp >= {timeFilter}
@@ -10,6 +155,7 @@ const DEFAULT_CUSTOM_KQL = `traces
 
 export default function AddBoxModal({ onAdd, onClose }) {
   const [mode, setMode] = useState('preset'); // 'preset' | 'custom'
+  const [promptCopied, setPromptCopied] = useState(false);
   const [presetId, setPresetId] = useState(
     (PRESET_QUERIES.find((q) => q.id.endsWith('_by_company')) || PRESET_QUERIES[0]).id
   );
@@ -195,10 +341,25 @@ export default function AddBoxModal({ onAdd, onClose }) {
           )}
 
           <div className="modal-footer">
-            <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">
-              <Plus size={15} /> Add box
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                navigator.clipboard.writeText(PROMPT_TEMPLATE);
+                setPromptCopied(true);
+                setTimeout(() => setPromptCopied(false), 2000);
+              }}
+              title="Copy a prompt template to send to an AI to help generate a box"
+            >
+              {promptCopied ? <Check size={14} /> : <Copy size={14} />}
+              {promptCopied ? 'Copied!' : 'Prompt template'}
             </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn-primary">
+                <Plus size={15} /> Add box
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -621,6 +621,22 @@ export const TIME_RANGES = [
   { label: 'Last 30d', value: '30d', hours: 720, bucket: '1d'  }
 ];
 
+export const BUCKET_OPTIONS = [
+  { label: 'Auto (from time range)', value: '' },
+  { label: '1 minute',   value: '1m'  },
+  { label: '5 minutes',  value: '5m'  },
+  { label: '10 minutes', value: '10m' },
+  { label: '15 minutes', value: '15m' },
+  { label: '30 minutes', value: '30m' },
+  { label: '1 hour',     value: '1h'  },
+  { label: '2 hours',    value: '2h'  },
+  { label: '4 hours',    value: '4h'  },
+  { label: '6 hours',    value: '6h'  },
+  { label: '12 hours',   value: '12h' },
+  { label: '1 day',      value: '1d'  },
+  { label: '7 days',     value: '7d'  },
+];
+
 export const CHART_TYPES = [
   { value: 'line',  label: 'Line'  },
   { value: 'bar',   label: 'Bar'   },
