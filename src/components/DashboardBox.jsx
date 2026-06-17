@@ -3,19 +3,20 @@ import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { RefreshCw, Eye, EyeOff, Trash2, BarChart2, TrendingUp, Activity, Info, Maximize2, X } from 'lucide-react';
+import { RefreshCw, Eye, EyeOff, Trash2, BarChart2, TrendingUp, Activity, Info, Maximize2, X, Pencil } from 'lucide-react';
 import { runKql, fmtMs, fmtNum } from '../lib/appInsights';
 import { PRESET_QUERIES, SERIES_COLORS, TIME_RANGES, injectFilters } from '../queries/presets';
 import BoxDetailModal from './BoxDetailModal';
+import EditBoxModal from './EditBoxModal';
 
 function buildDetailKql(box, timeFilter, tenantId, companyName) {
   let kql;
-  if (box.presetId) {
+  if (box.customDetailKql) {
+    kql = box.customDetailKql.replace(/\{timeFilter\}/g, timeFilter);
+  } else if (box.presetId) {
     const preset = PRESET_QUERIES.find((q) => q.id === box.presetId);
     if (!preset?.detailKql) return null;
     kql = preset.detailKql(timeFilter);
-  } else if (box.customDetailKql) {
-    kql = box.customDetailKql.replace(/\{timeFilter\}/g, timeFilter);
   } else {
     return null;
   }
@@ -24,16 +25,18 @@ function buildDetailKql(box, timeFilter, tenantId, companyName) {
 
 function buildKql(box, timeFilter, bucket, tenantId, companyName) {
   let kql;
-  if (box.presetId) {
+  if (box.customKql) {
+    kql = box.customKql
+      .replace(/\{timeFilter\}/g, timeFilter)
+      .replace(/\{bucket\}/g, bucket);
+  } else if (box.presetId) {
     const preset = PRESET_QUERIES.find((q) => q.id === box.presetId);
     if (!preset) return null;
     kql = preset.type === 'timeseries'
       ? preset.kql(timeFilter, bucket)
       : preset.kql(timeFilter);
   } else {
-    kql = (box.customKql || '')
-      .replace(/\{timeFilter\}/g, timeFilter)
-      .replace(/\{bucket\}/g, bucket);
+    return null;
   }
   return injectFilters(kql, { tenantId, companyName });
 }
@@ -163,13 +166,14 @@ function ChartContent({ data, chartType, color, boxId, height = 220 }) {
 
 const CHART_ICONS = { line: TrendingUp, bar: BarChart2, area: Activity };
 
-export default function DashboardBox({ box, settings, timeRange, tenantId, companyName, refreshKey, onRemove, onToggle, onUpdateChartType }) {
+export default function DashboardBox({ box, settings, timeRange, tenantId, companyName, refreshKey, onRemove, onToggle, onUpdateChartType, onUpdate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [chartType, setChartType] = useState(box.chartType || 'line');
   const [showDetail, setShowDetail] = useState(false);
   const [showExpanded, setShowExpanded] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [rawRows, setRawRows] = useState(null);
   const [builtKql, setBuiltKql] = useState(null);
   const [builtDetailKql, setBuiltDetailKql] = useState(null);
@@ -248,6 +252,9 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
           <button className="icon-btn" onClick={fetch} title="Refresh" disabled={loading}>
             <RefreshCw size={15} className={loading ? 'spinning' : ''} />
           </button>
+          <button className="icon-btn" onClick={() => setShowEdit(true)} title="Edit query">
+            <Pencil size={15} />
+          </button>
           <button className="icon-btn danger" onClick={onToggle} title={box.visible ? 'Hide' : 'Show'}>
             {box.visible ? <Eye size={15} /> : <EyeOff size={15} />}
           </button>
@@ -323,6 +330,13 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
         tenantId={tenantId}
         companyName={companyName}
         onClose={() => setShowDetail(false)}
+      />
+    )}
+    {showEdit && (
+      <EditBoxModal
+        box={box}
+        onSave={(patch) => { onUpdate(patch); fetch(); }}
+        onClose={() => setShowEdit(false)}
       />
     )}
     </>

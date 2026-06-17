@@ -150,6 +150,7 @@ export default function App() {
               onRemove={() => removeBox(box.id)}
               onToggle={() => toggleBox(box.id)}
               onUpdateChartType={(t) => updateBox(box.id, { chartType: t })}
+              onUpdate={(patch) => updateBox(box.id, patch)}
             />
           ))}
         </main>
