@@ -596,6 +596,88 @@ traces
 | where tostring(customDimensions.eventId) == 'RT0008'
 | count`,
   },
+
+  // ─── Ranked list (top N) queries ─────────────────────────────────────────
+  {
+    id: 'list_top_locking_objects',
+    name: 'Top locking objects',
+    description: 'RT0012 lock timeout victim AL objects ranked by occurrence count',
+    type: 'list',
+    color: '#885A89',
+    detailKql: _lockTimeoutDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0012'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
+  {
+    id: 'list_top_deadlock_objects',
+    name: 'Top deadlock objects',
+    description: 'RT0028 deadlock AL objects ranked by occurrence count',
+    type: 'list',
+    color: '#D4537E',
+    detailKql: _deadlockDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0028'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
+  {
+    id: 'list_top_slow_sql_objects',
+    name: 'Top slow SQL objects',
+    description: 'RT0005 AL objects ranked by slow SQL query count',
+    type: 'list',
+    color: '#378ADD',
+    detailKql: _slowSqlDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0005'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
+  {
+    id: 'list_top_slow_al_objects',
+    name: 'Top slow AL objects',
+    description: 'RT0018 AL objects ranked by slow method execution count',
+    type: 'list',
+    color: '#EF9F27',
+    detailKql: _slowAlDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0018'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
+  {
+    id: 'list_top_error_reasons',
+    name: 'Top error failure reasons',
+    description: 'RT0030 error dialogs grouped and ranked by failure reason',
+    type: 'list',
+    color: '#E24B4A',
+    detailKql: _errorDialogDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0030'
+| extend label = tostring(customDimensions.failureReason)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
 ];
 
 // Default layout — one box per preset, in display order
@@ -684,11 +766,16 @@ const PRESET_VIEW = {
   metric_p95_al_duration:    'slow_al',
   metric_total_errors:       'errors',
   metric_permission_errors:  'permissions',
-  metric_lock_timeout_count: 'locking',
-  metric_deadlock_count:     'locking',
-  metric_report_failures:    'reports',
-  metric_job_queue_errors:   'errors',
-  metric_web_service_calls:  'web_services',
+  metric_lock_timeout_count:  'locking',
+  metric_deadlock_count:      'locking',
+  metric_report_failures:     'reports',
+  metric_job_queue_errors:    'errors',
+  metric_web_service_calls:   'web_services',
+  list_top_locking_objects:   'locking',
+  list_top_deadlock_objects:  'locking',
+  list_top_slow_sql_objects:  'slow_sql',
+  list_top_slow_al_objects:   'slow_al',
+  list_top_error_reasons:     'errors',
 };
 
 export function boxInView(box, viewId) {

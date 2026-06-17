@@ -719,3 +719,47 @@ body {
   align-items: center; line-height: 1;
 }
 .filter-clear:hover { color: var(--text); }
+
+/* Ranked list display */
+.list-display {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 0;
+}
+.list-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 80px 52px;
+  align-items: center;
+  gap: 8px;
+}
+.list-rank {
+  font-size: 11px;
+  color: var(--text3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.list-label {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list-bar-wrap {
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.list-bar {
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.8;
+}
+.list-value {
+  font-size: 12px;
+  color: var(--text2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

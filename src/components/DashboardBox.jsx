@@ -47,6 +47,15 @@ function extractSeriesData(rows, type) {
     const val = row.value ?? row.Value ?? row.Count ?? row.count ?? Object.values(row)[0];
     return { kind: 'metric', value: val };
   }
+  if (type === 'list') {
+    return {
+      kind: 'list',
+      rows: rows.map((r) => ({
+        label: r.label ?? r.Label ?? String(Object.values(r).find(v => typeof v === 'string') ?? ''),
+        value: r.value ?? r.Value ?? r.Count ?? r.count ?? Object.values(r).find(v => typeof v === 'number') ?? 0,
+      })),
+    };
+  }
   const hasSeriesCol = rows.some((r) => r.series !== undefined);
   if (hasSeriesCol) {
     const seriesNames = [...new Set(rows.map((r) => r.series))];
@@ -76,6 +85,25 @@ function MetricDisplay({ value, unit, color }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '24px 0' }}>
       <span style={{ fontSize: 56, fontWeight: 500, color, lineHeight: 1 }}>{display}</span>
+    </div>
+  );
+}
+
+function ListDisplay({ rows, color }) {
+  if (!rows?.length) return <div className="box-empty">No data</div>;
+  const max = Math.max(...rows.map(r => Number(r.value) || 0), 1);
+  return (
+    <div className="list-display">
+      {rows.map((row, i) => (
+        <div key={i} className="list-row">
+          <span className="list-rank">{i + 1}</span>
+          <span className="list-label" title={row.label}>{row.label || '(unknown)'}</span>
+          <div className="list-bar-wrap">
+            <div className="list-bar" style={{ width: `${(Number(row.value) / max) * 100}%`, background: color }} />
+          </div>
+          <span className="list-value">{fmtNum(Number(row.value))}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -284,6 +312,9 @@ export default function DashboardBox({ box, settings, timeRange, tenantId, compa
           <>
             {data.kind === 'metric' && (
               <MetricDisplay value={data.value} unit={unit} color={color} />
+            )}
+            {data.kind === 'list' && (
+              <ListDisplay rows={data.rows} color={color} />
             )}
             {hasChart && (
               <ChartContent data={data} chartType={chartType} color={color} boxId={box.id} height={220} />

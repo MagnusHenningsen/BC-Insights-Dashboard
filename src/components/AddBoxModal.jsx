@@ -12,10 +12,10 @@ I will paste each field directly into the dashboard UI.
 == BOX FIELDS ==
 - Name: display name shown on the box
 - Description: one-line subtitle shown under the name
-- Type: "timeseries" (graph over time) or "metric" (single number)
+- Type: "timeseries" (graph over time), "metric" (single number), or "list" (ranked top-N list)
 - Chart type (timeseries only): "line", "bar", or "area"
 - Color: a hex color code for the series
-- KQL query: the main chart/metric query (see format below)
+- KQL query: the main chart/metric/list query (see format below)
 - Detail query: optional record-level drill-down query (see format below)
 
 == KQL PLACEHOLDERS ==
@@ -63,6 +63,20 @@ Example:
   | where tostring(customDimensions.eventId) == 'RT0005'
   | count
   | project value=Count
+
+== LIST QUERY REQUIREMENTS ==
+Must return multiple rows, each with a label (string) and value (number) column, ordered by value desc.
+Use for "top N" breakdowns — e.g. which objects cause the most locks, which errors appear most often.
+No {bucket} placeholder needed.
+Example (top 10 locking objects):
+  traces
+  | where timestamp >= {timeFilter}
+  | where tostring(customDimensions.eventId) == 'RT0012'
+  | extend label = tostring(customDimensions.alObjectName)
+  | where isnotempty(label)
+  | summarize value=count() by label
+  | top 10 by value desc
+  | project label, value
 
 == DETAIL QUERY REQUIREMENTS ==
 Record-level query shown in a drill-down tab. Uses {timeFilter} only (no {bucket}).
@@ -129,8 +143,8 @@ Respond with only this block — no extra explanation:
 
 Name: <name>
 Description: <description>
-Type: <timeseries|metric>
-Chart type: <line|bar|area>
+Type: <timeseries|list|metric>
+Chart type: <line|bar|area>  (omit if type is list or metric)
 Color: <#hex>
 
 KQL query:
@@ -153,6 +167,22 @@ const DEFAULT_CUSTOM_KQL = `traces
 | summarize value=count() by bin(timestamp, {bucket})
 | order by timestamp asc`;
 
+const DEFAULT_METRIC_KQL = `traces
+| where timestamp >= {timeFilter}
+| where tostring(customDimensions.eventId) == 'RT0005'
+| count`;
+
+const DEFAULT_LIST_KQL = `traces
+| where timestamp >= {timeFilter}
+| where tostring(customDimensions.eventId) == 'RT0012'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`;
+
+const DEFAULT_KQLS = new Set([DEFAULT_CUSTOM_KQL, DEFAULT_METRIC_KQL, DEFAULT_LIST_KQL]);
+
 export default function AddBoxModal({ onAdd, onClose }) {
   const [mode, setMode] = useState('preset'); // 'preset' | 'custom'
   const [promptCopied, setPromptCopied] = useState(false);
@@ -169,6 +199,15 @@ export default function AddBoxModal({ onAdd, onClose }) {
   const [viewId, setViewId] = useState('');
 
   const selectedPreset = PRESET_QUERIES.find((q) => q.id === presetId);
+
+  const handleBoxTypeChange = (newType) => {
+    if (DEFAULT_KQLS.has(customKql)) {
+      if (newType === 'timeseries') setCustomKql(DEFAULT_CUSTOM_KQL);
+      else if (newType === 'metric') setCustomKql(DEFAULT_METRIC_KQL);
+      else if (newType === 'list') setCustomKql(DEFAULT_LIST_KQL);
+    }
+    setBoxType(newType);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -215,13 +254,13 @@ export default function AddBoxModal({ onAdd, onClose }) {
             <div className="field">
               <label>Preset query</label>
               <select value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-                <optgroup label="By company">
-                  {PRESET_QUERIES.filter((q) => q.id.endsWith('_by_company')).map((q) => (
+                <optgroup label="Time series">
+                  {PRESET_QUERIES.filter((q) => q.type === 'timeseries').map((q) => (
                     <option key={q.id} value={q.id}>{q.name}</option>
                   ))}
                 </optgroup>
-                <optgroup label="Time series">
-                  {PRESET_QUERIES.filter((q) => q.type === 'timeseries' && !q.id.endsWith('_by_company')).map((q) => (
+                <optgroup label="Ranked list (top N)">
+                  {PRESET_QUERIES.filter((q) => q.type === 'list').map((q) => (
                     <option key={q.id} value={q.id}>{q.name}</option>
                   ))}
                 </optgroup>
@@ -243,24 +282,30 @@ export default function AddBoxModal({ onAdd, onClose }) {
                 <label>Box type</label>
                 <div className="radio-row">
                   <label className="radio-label">
-                    <input type="radio" value="timeseries" checked={boxType === 'timeseries'} onChange={() => setBoxType('timeseries')} />
+                    <input type="radio" value="timeseries" checked={boxType === 'timeseries'} onChange={() => handleBoxTypeChange('timeseries')} />
                     Time series (graph)
                   </label>
                   <label className="radio-label">
-                    <input type="radio" value="metric" checked={boxType === 'metric'} onChange={() => setBoxType('metric')} />
+                    <input type="radio" value="list" checked={boxType === 'list'} onChange={() => handleBoxTypeChange('list')} />
+                    Ranked list (top N)
+                  </label>
+                  <label className="radio-label">
+                    <input type="radio" value="metric" checked={boxType === 'metric'} onChange={() => handleBoxTypeChange('metric')} />
                     Metric (single number)
                   </label>
                 </div>
                 <p className="field-hint">
                   {boxType === 'timeseries'
                     ? 'Query must return: timestamp (datetime), value (number). Optional: series (string) for multi-line.'
+                    : boxType === 'list'
+                    ? 'Query must return multiple rows with label (string) and value (number) columns, ordered by value desc.'
                     : 'Query must return a single row with a numeric column named "value" or "Count".'}
                 </p>
               </div>
               <div className="field">
                 <label>KQL query</label>
                 <p className="field-hint" style={{ marginBottom: 6 }}>
-                  Use <code>{'{timeFilter}'}</code> for the time range (e.g. <code>ago(24h)</code>) and <code>{'{bucket}'}</code> for the time bucket.
+                  Use <code>{'{timeFilter}'}</code> for the time range.{boxType === 'timeseries' && <> Use <code>{'{bucket}'}</code> for the time bucket.</>}
                 </p>
                 <textarea
                   value={customKql}
