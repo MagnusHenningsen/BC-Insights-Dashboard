@@ -599,38 +599,6 @@ traces
 
   // ─── Ranked list (top N) queries ─────────────────────────────────────────
   {
-    id: 'list_top_locking_objects',
-    name: 'Top locking objects',
-    description: 'RT0012 lock timeout victim AL objects ranked by occurrence count',
-    type: 'list',
-    color: '#885A89',
-    detailKql: _lockTimeoutDetail,
-    kql: (tf) => `traces
-| where timestamp >= ${tf}
-| where tostring(customDimensions.eventId) == 'RT0012'
-| extend label = tostring(customDimensions.alObjectName)
-| where isnotempty(label)
-| summarize value=count() by label
-| top 10 by value desc
-| project label, value`,
-  },
-  {
-    id: 'list_top_deadlock_objects',
-    name: 'Top deadlock objects',
-    description: 'RT0028 deadlock AL objects ranked by occurrence count',
-    type: 'list',
-    color: '#D4537E',
-    detailKql: _deadlockDetail,
-    kql: (tf) => `traces
-| where timestamp >= ${tf}
-| where tostring(customDimensions.eventId) == 'RT0028'
-| extend label = tostring(customDimensions.alObjectName)
-| where isnotempty(label)
-| summarize value=count() by label
-| top 10 by value desc
-| project label, value`,
-  },
-  {
     id: 'list_top_slow_sql_objects',
     name: 'Top slow SQL objects',
     description: 'RT0005 AL objects ranked by slow SQL query count',
@@ -678,11 +646,47 @@ traces
 | top 10 by value desc
 | project label, value`,
   },
+  {
+    id: 'list_top_locking_objects',
+    name: 'Top locking objects',
+    description: 'RT0012 lock timeout victim AL objects ranked by occurrence count',
+    type: 'list',
+    color: '#885A89',
+    detailKql: _lockTimeoutDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0012'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
+  {
+    id: 'list_top_deadlock_objects',
+    name: 'Top deadlock objects',
+    description: 'RT0028 deadlock AL objects ranked by occurrence count',
+    type: 'list',
+    color: '#D4537E',
+    detailKql: _deadlockDetail,
+    kql: (tf) => `traces
+| where timestamp >= ${tf}
+| where tostring(customDimensions.eventId) == 'RT0028'
+| extend label = tostring(customDimensions.alObjectName)
+| where isnotempty(label)
+| summarize value=count() by label
+| top 10 by value desc
+| project label, value`,
+  },
 ];
 
-// Default layout — one box per preset, in display order
+// Default layout — priority list boxes first, then everything else
+const TOP_PRESET_IDS = ['list_top_slow_sql_objects', 'list_top_slow_al_objects', 'list_top_error_reasons'];
 let _uid = 1000;
-export const DEFAULT_BOXES = PRESET_QUERIES.map((q) => ({
+export const DEFAULT_BOXES = [
+  ...PRESET_QUERIES.filter((q) => TOP_PRESET_IDS.includes(q.id)),
+  ...PRESET_QUERIES.filter((q) => !TOP_PRESET_IDS.includes(q.id)),
+].map((q) => ({
   id: String(++_uid),
   presetId: q.id,
   name: q.name,
