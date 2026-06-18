@@ -24,17 +24,24 @@ function buildDetailKql(box, timeFilter, tenantId, companyName) {
 }
 
 function buildKql(box, timeFilter, bucket, tenantId, companyName) {
+  const tzOffset = -new Date().getTimezoneOffset();   // minutes ahead of UTC
+  const negTzOffset = -tzOffset;
   let kql;
   if (box.customKql) {
     kql = box.customKql
       .replace(/\{timeFilter\}/g, timeFilter)
-      .replace(/\{bucket\}/g, bucket);
+      .replace(/\{bucket\}/g, bucket)
+      .replace(/\{tzOffset\}/g, String(tzOffset))
+      .replace(/\{negTzOffset\}/g, String(negTzOffset));
   } else if (box.presetId) {
     const preset = PRESET_QUERIES.find((q) => q.id === box.presetId);
     if (!preset) return null;
     kql = preset.type === 'timeseries'
       ? preset.kql(timeFilter, bucket)
       : preset.kql(timeFilter);
+    kql = kql
+      .replace(/\{tzOffset\}/g, String(tzOffset))
+      .replace(/\{negTzOffset\}/g, String(negTzOffset));
   } else {
     return null;
   }

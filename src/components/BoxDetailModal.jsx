@@ -10,6 +10,14 @@ function parseObj(val) {
   return null;
 }
 
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+function isTimestamp(val) {
+  return typeof val === 'string' && ISO_RE.test(val) && !isNaN(Date.parse(val));
+}
+function fmtLocalTime(val) {
+  return new Date(val).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' });
+}
+
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
   const copy = (e) => {
@@ -71,6 +79,7 @@ function cellDisplay(col, val) {
     return obj ? `{ ${Object.keys(obj).length} props }` : String(val ?? '');
   }
   if (val !== null && val !== undefined && typeof val === 'object') return '{…}';
+  if (isTimestamp(val)) return fmtLocalTime(val);
   return String(val ?? '');
 }
 
@@ -129,7 +138,7 @@ function ExpandableRow({ row, cols, isExpanded, onToggle }) {
                     </div>
                   );
                 }
-                const val = String(row[c] ?? '');
+                const val = isTimestamp(row[c]) ? fmtLocalTime(row[c]) : String(row[c] ?? '');
                 const isStackTrace = c === 'alStackTrace';
                 const isLong = isStackTrace || val.length > 80 || val.includes('\n');
                 return (

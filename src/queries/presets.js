@@ -161,7 +161,7 @@ traces
 | where tostring(customDimensions.eventId) == '${eventId}'
 | extend company = tostring(customDimensions.companyName)
 | where company in (topCompanies)
-| make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=company
+| make-series value=count() default=0 on timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket} by series=company
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`;
 
@@ -185,14 +185,15 @@ export const PRESET_QUERIES = [
     defaultChartType: 'area',
     color: '#378ADD',
     detailKql: _slowSqlDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
+    kql: (tf, bucket) => `range timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket}
 | join kind=leftouter (
     traces
     | where timestamp >= ${tf}
     | where tostring(customDimensions.eventId) == 'RT0005'
     | extend durMs = toreal(totimespan(customDimensions.executionTime)) / 10000
     | where isnotnull(durMs)
-    | summarize value=avg(durMs) by bin(timestamp, ${bucket})
+    | summarize value=avg(durMs) by local_bin=bin(datetime_add('minute', {tzOffset}, timestamp), ${bucket})
+    | project timestamp=datetime_add('minute', {negTzOffset}, local_bin), value
 ) on timestamp
 | extend value = coalesce(value, real(0))
 | project timestamp, value
@@ -219,7 +220,7 @@ traces
 | where tostring(customDimensions.eventId) == 'RT0005'
 | extend obj = tostring(customDimensions.alObjectName)
 | where obj in (topObjects)
-| make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=obj
+| make-series value=count() default=0 on timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket} by series=obj
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`,
   },
@@ -243,14 +244,15 @@ traces
     defaultChartType: 'area',
     color: '#EF9F27',
     detailKql: _slowAlDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
+    kql: (tf, bucket) => `range timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket}
 | join kind=leftouter (
     traces
     | where timestamp >= ${tf}
     | where tostring(customDimensions.eventId) == 'RT0018'
     | extend durMs = toreal(totimespan(customDimensions.executionTime)) / 10000
     | where isnotnull(durMs)
-    | summarize value=avg(durMs) by bin(timestamp, ${bucket})
+    | summarize value=avg(durMs) by local_bin=bin(datetime_add('minute', {tzOffset}, timestamp), ${bucket})
+    | project timestamp=datetime_add('minute', {negTzOffset}, local_bin), value
 ) on timestamp
 | extend value = coalesce(value, real(0))
 | project timestamp, value
@@ -277,7 +279,7 @@ traces
 | where tostring(customDimensions.eventId) == 'RT0018'
 | extend obj = tostring(customDimensions.alObjectName)
 | where obj in (topObjects)
-| make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=obj
+| make-series value=count() default=0 on timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket} by series=obj
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`,
   },
@@ -314,7 +316,7 @@ traces
 | where tostring(customDimensions.eventId) == 'RT0030'
 | extend reason = tostring(customDimensions.failureReason)
 | where reason in (topReasons)
-| make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=reason
+| make-series value=count() default=0 on timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket} by series=reason
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`,
   },
@@ -363,7 +365,7 @@ traces
 | where tostring(customDimensions.eventId) == 'RT0012'
 | extend obj = tostring(customDimensions.alObjectName)
 | where obj in (topObjects)
-| make-series value=count() default=0 on timestamp from bin(${tf}, ${bucket}) to now() step ${bucket} by series=obj
+| make-series value=count() default=0 on timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket} by series=obj
 | mv-expand timestamp to typeof(datetime), value to typeof(long)
 | order by timestamp asc`,
   },
@@ -399,7 +401,7 @@ traces
     defaultChartType: 'area',
     color: '#1D9E75',
     detailKql: _reportDetail,
-    kql: (tf, bucket) => `range timestamp from bin(${tf}, ${bucket}) to now() step ${bucket}
+    kql: (tf, bucket) => `range timestamp from datetime_add('minute', {negTzOffset}, bin(datetime_add('minute', {tzOffset}, ${tf}), ${bucket})) to now() step ${bucket}
 | join kind=leftouter (
     traces
     | where timestamp >= ${tf}
@@ -407,7 +409,8 @@ traces
     | where tostring(customDimensions.result) == 'Success'
     | extend durMs = toreal(totimespan(customDimensions.totalTime)) / 10000
     | where isnotnull(durMs)
-    | summarize value=avg(durMs) by bin(timestamp, ${bucket})
+    | summarize value=avg(durMs) by local_bin=bin(datetime_add('minute', {tzOffset}, timestamp), ${bucket})
+    | project timestamp=datetime_add('minute', {negTzOffset}, local_bin), value
 ) on timestamp
 | extend value = coalesce(value, real(0))
 | project timestamp, value
